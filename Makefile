@@ -9,7 +9,6 @@ ifeq ($(strip $(DEVKITPRO)),)
 $(error "Please set DEVKITPRO in your environment.")
 endif
 
-# Explicit paths — do NOT rely on gba_rules to define these
 LIBGBA   := $(DEVKITPRO)/libgba
 ARCH     := -mthumb -mthumb-interwork
 TARGET   := DLD
@@ -31,6 +30,7 @@ export OUTPUT    := $(CURDIR)/$(TARGET)
 export VPATH     := $(foreach dir,$(SOURCES),$(CURDIR)/$(dir))
 export DEPSDIR   := $(CURDIR)/$(BUILD)
 export PATH      := $(DEVKITARM)/bin:$(PATH)
+export CC        := $(DEVKITARM)/bin/arm-none-eabi-gcc
 export LD        := $(CC)
 
 CFILES := $(foreach dir,$(SOURCES),$(notdir $(wildcard $(dir)/*.c)))
@@ -49,6 +49,13 @@ clean:
 else
 
 DEPENDS := $(OFILES:.o=.d)
+
+# ---- Explicit ARM compile rules (the crucial fix) ----
+%.o: %.c
+	$(CC) $(CFLAGS) -c $< -o $@
+
+%.o: %.s
+	$(CC) $(CFLAGS) -x assembler-with-cpp -c $< -o $@
 
 $(OUTPUT).gba: $(OUTPUT).elf
 	@arm-none-eabi-objcopy -O binary $< $@
