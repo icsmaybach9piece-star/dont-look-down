@@ -1,0 +1,33 @@
+name: Build Don't Look Down GBA
+
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    container:
+      image: devkitpro/devkitarm:latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build GBA ROM
+        run: |
+          export DEVKITPRO=/opt/devkitpro
+          export DEVKITARM=/opt/devkitpro/devkitARM
+          export PATH=$DEVKITPRO/tools/bin:$DEVKITARM/bin:$PATH
+          make
+
+      - name: Check ROM
+        run: |
+          ls -lh DLD.gba
+
+      - name: Upload ROM
+        uses: actions/upload-artifact@v4
+        with:
+          name: DONT-LOOK-DOWN-GBA
+          path: DLD.gba
