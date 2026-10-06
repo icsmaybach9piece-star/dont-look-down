@@ -15,6 +15,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Clean any stale build artifacts
+        run: |
+          rm -rf build
+          rm -f DLD.gba DLD.elf
+
       - name: Build GBA ROM
         run: |
           export DEVKITPRO=/opt/devkitpro
@@ -22,9 +27,10 @@ jobs:
           export PATH=$DEVKITPRO/tools/bin:$DEVKITARM/bin:$PATH
           make
 
-      - name: Check ROM
+      - name: Verify ROM exists and has size
         run: |
           ls -lh DLD.gba
+          test -s DLD.gba || (echo "ROM is EMPTY" && exit 1)
 
       - name: Upload ROM
         uses: actions/upload-artifact@v4
