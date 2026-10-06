@@ -1,55 +1,41 @@
-.SUFFIXES:
+# Don't Look Down — GBA Makefile
+# Targets devkitARM / libgba in the official devkitPro Docker image.
 
 ifeq ($(strip $(DEVKITARM)),)
 $(error "Please set DEVKITARM in your environment.")
 endif
 
-include $(DEVKITARM)/gba_rules
+ifeq ($(strip $(DEVKITPRO)),)
+$(error "Please set DEVKITPRO in your environment.")
+endif
 
-TARGET := DLD
-BUILD := build
-
-SOURCES := src
+# Explicit paths — do NOT rely on gba_rules to define these
+LIBGBA   := $(DEVKITPRO)/libgba
+ARCH     := -mthumb -mthumb-interwork
+TARGET   := DLD
+BUILD    := build
+SOURCES  := src
 INCLUDES := include
 
-ARCH := -mthumb -mthumb-interwork
+CFLAGS  := -g -Wall -O2 -mcpu=arm7tdmi -mtune=arm7tdmi \
+           -ffunction-sections -fdata-sections $(ARCH)
+CFLAGS  += $(foreach dir,$(INCLUDES),-I$(CURDIR)/$(dir)) \
+           -I$(LIBGBA)/include
 
-CFLAGS := -g -Wall -O2 \
-	-mcpu=arm7tdmi -mtune=arm7tdmi \
-	-ffunction-sections -fdata-sections \
-	$(ARCH)
-
-CFLAGS += $(INCLUDE)
-
-ASFLAGS := -g $(ARCH)
-
-LDFLAGS = -g $(ARCH) -Wl,-Map,$(notdir $*.map)
-
-LIBS := -lgba
-LIBDIRS := $(LIBGBA)
+LDFLAGS := -g $(ARCH) -Wl,-Map,$(TARGET).map
+LIBS    := -lgba
 
 ifneq ($(BUILD),$(notdir $(CURDIR)))
 
-export OUTPUT := $(CURDIR)/$(TARGET)
-
-export VPATH := $(foreach dir,$(SOURCES),$(CURDIR)/$(dir))
-
-export DEPSDIR := $(CURDIR)/$(BUILD)
-
-export PATH := $(DEVKITARM)/bin:$(PATH)
+export OUTPUT    := $(CURDIR)/$(TARGET)
+export VPATH     := $(foreach dir,$(SOURCES),$(CURDIR)/$(dir))
+export DEPSDIR   := $(CURDIR)/$(BUILD)
+export PATH      := $(DEVKITARM)/bin:$(PATH)
+export LD        := $(CC)
 
 CFILES := $(foreach dir,$(SOURCES),$(notdir $(wildcard $(dir)/*.c)))
 SFILES := $(foreach dir,$(SOURCES),$(notdir $(wildcard $(dir)/*.s)))
-
 export OFILES := $(CFILES:.c=.o) $(SFILES:.s=.o)
-
-export INCLUDE := $(foreach dir,$(INCLUDES),-I$(CURDIR)/$(dir)) \
-	$(foreach dir,$(LIBDIRS),-I$(dir)/include) \
-	-I$(CURDIR)/$(BUILD)
-
-export LIBPATHS := $(foreach dir,$(LIBDIRS),-L$(dir)/lib)
-
-export LD := $(CC)
 
 .PHONY: $(BUILD) clean
 
@@ -58,16 +44,19 @@ $(BUILD):
 	@$(MAKE) --no-print-directory -C $(BUILD) -f $(CURDIR)/Makefile
 
 clean:
-	@echo clean ...
-	@rm -fr $(BUILD) $(TARGET).elf $(TARGET).gba
+	@rm -fr $(BUILD) $(TARGET).elf $(TARGET).gba $(TARGET).map
 
 else
 
 DEPENDS := $(OFILES:.o=.d)
 
 $(OUTPUT).gba: $(OUTPUT).elf
+	@arm-none-eabi-objcopy -O binary $< $@
+	@echo ">>> Wrote $@ ($(shell wc -c < $@) bytes)"
 
-$(OUTPUT).elf: $(OFILES) $(LIBGBA)/lib/libgba.a
+$(OUTPUT).elf: $(OFILES)
+	@echo ">>> Linking $@"
+	$(CC) $(LDFLAGS) $(OFILES) -L$(LIBGBA)/lib $(LIBS) -o $@
 
 -include $(DEPENDS)
 
